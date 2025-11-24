@@ -1,4 +1,3 @@
-// controllers/authController.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
@@ -19,7 +18,7 @@ const generateRefreshToken = (user) => {
   );
 };
 
-// ================= Register =================
+
 exports.registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -36,7 +35,6 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-// ================= Login =================
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -49,7 +47,7 @@ exports.loginUser = async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    // Send refresh token as httpOnly cookie
+    
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: false, // set true if HTTPS
@@ -66,16 +64,22 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-// ================= Refresh Token =================
-exports.refreshToken = (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
-  if (!refreshToken) return res.status(401).json({ message: 'No refresh token provided' });
 
-  jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Invalid or expired refresh token' });
+exports.refreshToken = async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken)
+    return res.status(401).json({ message: 'No refresh token provided' });
+
+  jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, async (err, decoded) => {
+    if (err)
+      return res.status(403).json({ message: 'Invalid or expired refresh token' });
+
+    // get full user details
+    const user = await User.findById(decoded.id);
 
     const newAccessToken = jwt.sign(
-      { id: user.id },
+      { id: user._id, name: user.name, role: user.role },
       process.env.ACCESS_TOKEN_SECRET,
       { expiresIn: process.env.ACCESS_TOKEN_EXPIRE }
     );
@@ -84,13 +88,11 @@ exports.refreshToken = (req, res) => {
   });
 };
 
-// ================= Logout =================
 exports.logoutUser = (req, res) => {
   res.clearCookie('refreshToken');
   res.json({ message: 'Logout successful' });
 };
 
-// ================= Protected Dashboard =================
 exports.dashboard = (req, res) => {
   res.json({
     message: `Welcome ${req.user.name} to your dashboard`,
